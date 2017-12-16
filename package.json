@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "description": "Preview rendering for Zeo",
   "scripts": {
-    "start": "webpack-dev-server --host 0.0.0.0 --devtool eval-source-map --history-api-fallback --disable-host-check",
+    "start": "node index.js",
+    "dev": "webpack-dev-server --host 0.0.0.0 --devtool eval-source-map --history-api-fallback --disable-host-check",
     "build": "webpack -p"
   },
   "repository": {
