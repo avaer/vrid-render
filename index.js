@@ -93,7 +93,7 @@ app.get('/render', (req, res, next) => {
           res.end('timed out');
 
           page.close();
-        }, 5 * 1000);
+        }, 30 * 1000);
         await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
       } catch(err) {
         res.status(500);
