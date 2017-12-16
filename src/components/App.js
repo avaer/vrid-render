@@ -90,58 +90,6 @@ const _getFileTexture = file => {
   return texture;
 };
 
-const _isImage = url => new Promise((accept, reject) => {
-  const img = new Image();
-  img.onload = () => {
-    accept(true);
-  };
-  img.onerror = err => {
-    accept(false);
-  };
-  img.crossOrigin = 'Anonymous';
-  img.src = url;
-});
-const _isVideo = url => new Promise((accept, reject) => {
-  const video = document.createElement('video');
-  video.oncanplay = () => {
-    accept(true);
-  };
-  video.onerror = err => {
-    accept(false);
-  };
-  video.crossOrigin = 'Anonymous';
-  video.src = url;
-});
-function _requestMediaType(url) {
-  if (url) {
-    return new Promise((accept, reject) => {
-      const imagePromise = _isImage(url);
-      const videoPromise = _isVideo(url);
-
-      imagePromise.then(ok => {
-        if (ok) {
-          accept('image');
-        }
-      });
-      videoPromise.then(ok => {
-        if (ok) {
-          accept('video');
-        }
-      });
-      Promise.all([
-        imagePromise,
-        videoPromise,
-      ])
-        .then(() => {
-          accept(null);
-        })
-        .catch(reject);
-    });
-  } else {
-    return Promise.resolve(null);
-  }
-}
-
 class TarLoader extends THREE.LoadingManager {
   constructor() {
     super();
