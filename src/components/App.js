@@ -338,9 +338,8 @@ class Scene extends React.Component {
 
   render() {
     return <canvas
-      width={this.props.width * window.devicePixelRatio}
-      height={this.props.height * window.devicePixelRatio}
-      style={{width: `${this.props.width}px`, height: `${this.props.width}px`}}
+      width={this.props.width}
+      height={this.props.height}
       ref="canvas"
     />
   }
@@ -515,7 +514,14 @@ export default class App extends React.Component {
 
   render() {
     if (this.state.pending === 0) {
-      return <Scene width={640} height={480} model={this.state.preview}/>;
+      let size = parseInt(getParameterByName('s', window.location.href), 10);
+      if (isFinite(size) && size > 0) {
+        // nothing
+      } else {
+        size = 1280;
+      }
+
+      return <Scene width={size} height={size} model={this.state.preview}/>;
     } else {
       return null;
     }

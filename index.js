@@ -4,7 +4,7 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 
 const port = process.env['PORT'] || 8080;
-
+const size = 1280;
 
 const app = express();
 app.use('/static', express.static(__dirname));
@@ -14,7 +14,6 @@ app.get('/render', (req, res, next) => {
   (async () => {
     try {
       const page = await browser.newPage();
-      const size = 640;
       await page.setViewport({
         width: size,
         height: size,
@@ -55,14 +54,13 @@ app.get('/render', (req, res, next) => {
           clearTimeout(timeout);
         }
       });
-      page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}`);
-
       const timeout = setTimeout(() => {
         res.status(500);
         res.end('timed out');
 
         page.close();
       }, 5 * 1000);
+      await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
     } catch(err) {
       res.status(500);
       res.end(err.stack);
