@@ -103,7 +103,6 @@ puppeteer.launch({
   args: [
     '--no-sandbox',
     '--no-zygote',
-    '--disable-http-cache',
   ],
 })
   .then(newBrowser => {
