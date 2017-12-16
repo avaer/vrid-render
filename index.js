@@ -13,6 +13,23 @@ const cache = new LRU({
   max: 100,
   maxAge,
 });
+let running = false;
+const queue = [];
+const _requestTicket = fn => {
+  if (!running) {
+    running = true;
+
+    fn(() => {
+      running = false;
+
+      if (queue.length > 0) {
+        _requestTicket(queue.shift());
+      }
+    });
+  } else {
+    queue.push(fn);
+  }
+};
 
 const app = express();
 app.use('/static', express.static(__dirname));
@@ -22,60 +39,78 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
   let promise = cache.get(u);
   if (!promise) {
     promise = new Promise((accept, reject) => {
-      (async () => {
-        const page = await browser.newPage();
-        await page.setViewport({
-          width: size,
-          height: size,
-        });
-        page.on('error', err => {
-          reject(err);
-        });
-        page.on('pageerror', err => {
-          reject(err);
-        });
-        /* page.on('request', req => {
-          console.log('request', req.url);
-        });
-        page.on('response', res => {
-          console.log('response', res.url);
-        });
-        page.on('requestfinished', req => {
-          console.log('requestfinished', req.url);
-        });
-        page.on('requestfailed', err => {
-          console.log('request failed', err);
-        });  */
-        page.on('console', async msg => {
-          if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'loaded') {
-            const buffer = await page.screenshot({
-              type: 'jpeg',
-            });
-            buffer.etag = etag(buffer);
+      _requestTicket(next => {
+        (async () => {
+          const page = await browser.newPage();
+          await page.setViewport({
+            width: size,
+            height: size,
+          });
+          page.on('error', err => {
+            reject(err);
 
-            accept(buffer);
+            next();
+          });
+          page.on('pageerror', err => {
+            reject(err);
 
-            page.close();
-            clearTimeout(timeout);
-          } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
-            const err = new Error(msg.args[2]._remoteObject.value);
-            err.statusCode = msg.args[1]._remoteObject.value;
+            next();
+          });
+          /* page.on('request', req => {
+            console.log('request', req.url);
+          });
+          page.on('response', res => {
+            console.log('response', res.url);
+          });
+          page.on('requestfinished', req => {
+            console.log('requestfinished', req.url);
+          });
+          page.on('requestfailed', err => {
+            console.log('request failed', err);
+          });  */
+          page.on('console', async msg => {
+            if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'loaded') {
+              const buffer = await page.screenshot({
+                type: 'jpeg',
+              });
+              buffer.etag = etag(buffer);
 
+              accept(buffer);
+
+              page.close();
+              clearTimeout(timeout);
+
+              next();
+            } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
+              const err = new Error(msg.args[2]._remoteObject.value);
+              err.statusCode = msg.args[1]._remoteObject.value;
+
+              reject(err);
+
+              page.close();
+              clearTimeout(timeout);
+
+              next();
+            } else {
+              console.log(msg.text);
+            }
+          });
+          const timeout = setTimeout(() => {
+            const err = new Error('timed out');
             reject(err);
 
             page.close();
-            clearTimeout(timeout);
-          }
-        });
-        const timeout = setTimeout(() => {
-          const err = new Error('timed out');
-          reject(err);
 
-          page.close();
-        }, 30 * 1000);
-        await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
-      })()
-        .catch(reject);
+            next();
+          }, 30 * 1000);
+          await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
+        })()
+          .catch(err => {
+            reject(err);
+
+            next();
+          });
+      });
     });
     cache.set(u, promise);
   }
