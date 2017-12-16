@@ -1,0 +1,40 @@
+{
+  "name": "zeo-render",
+  "version": "0.0.1",
+  "description": "Preview rendering for Zeo",
+  "scripts": {
+    "start": "webpack-dev-server --host 0.0.0.0 --devtool eval-source-map --history-api-fallback --disable-host-check",
+    "build": "webpack -p"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modulesio/zeo-render.git"
+  },
+  "author": "Avaer Kazmer <a@modules.io>",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.16.2",
+    "js-untar": "^0.1.5",
+    "prop-types": "^15.6.0",
+    "puppeteer": "^0.13.0",
+    "react": "^16.1.1",
+    "react-dom": "^16.1.1",
+    "react-interactive": "^0.8.1",
+    "react-router-dom": "^4.2.2"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-eslint": "^7.2.3",
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.0",
+    "babel-preset-react": "^6.24.1",
+    "babel-preset-stage-1": "^6.24.1",
+    "eslint": "^3.19.0",
+    "eslint-config-airbnb": "^14.1.0",
+    "eslint-plugin-import": "^2.2.0",
+    "eslint-plugin-jsx-a11y": "^4.0.0",
+    "eslint-plugin-react": "^6.10.3",
+    "webpack": "^3.6.0",
+    "webpack-dev-server": "^2.8.2"
+  }
+}
