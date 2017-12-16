@@ -275,65 +275,69 @@ class Scene extends React.Component {
   componentDidMount() {
     const {canvas} = this.refs;
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
-    });
-    // renderer.setClearColor(0x000000, 1);
-    this.renderer = renderer;
+    if (this.props.model) {
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: true,
+      });
+      // renderer.setClearColor(0x000000, 1);
+      this.renderer = renderer;
 
-    const scene = new THREE.Scene();
-    scene.matrixAutoUpdate = false;
+      const scene = new THREE.Scene();
+      scene.matrixAutoUpdate = false;
 
-    const camera = new THREE.PerspectiveCamera(90, 1, 0.1, 1000);
-    scene.add(camera);
+      const camera = new THREE.PerspectiveCamera(90, 1, 0.1, 1000);
+      scene.add(camera);
 
-    const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5);
-    scene.add(ambientLight);
+      const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.5);
+      scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.5);
-    directionalLight.position.set(1, 1, 1);
-    directionalLight.updateMatrixWorld();
-    scene.add(directionalLight);
+      const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.5);
+      directionalLight.position.set(1, 1, 1);
+      directionalLight.updateMatrixWorld();
+      scene.add(directionalLight);
 
-    const boundingBox = new THREE.Box3().setFromObject(this.props.model);
-    let size = Math.max(Math.abs(boundingBox.min.x), Math.abs(boundingBox.min.y)/2, Math.abs(boundingBox.min.z), Math.abs(boundingBox.max.x), Math.abs(boundingBox.max.y)/2, Math.abs(boundingBox.max.z));
-    const center = boundingBox.getCenter();
+      const boundingBox = new THREE.Box3().setFromObject(this.props.model);
+      let size = Math.max(Math.abs(boundingBox.min.x), Math.abs(boundingBox.min.y)/2, Math.abs(boundingBox.min.z), Math.abs(boundingBox.max.x), Math.abs(boundingBox.max.y)/2, Math.abs(boundingBox.max.z));
+      const center = boundingBox.getCenter();
 
-    const oversizeFactor = size / 100;
-    if (oversizeFactor > 1) {
-      const scale = 1/oversizeFactor;
-      this.props.model.scale.multiplyScalar(scale);
-      this.props.model.updateMatrixWorld();
+      const oversizeFactor = size / 100;
+      if (oversizeFactor > 1) {
+        const scale = 1/oversizeFactor;
+        this.props.model.scale.multiplyScalar(scale);
+        this.props.model.updateMatrixWorld();
 
-      size *= scale;
-      center.multiplyScalar(scale);
+        size *= scale;
+        center.multiplyScalar(scale);
+      }
+      const undersizeFactor = size;
+      if (undersizeFactor < 1) {
+        const scale = 1/undersizeFactor;
+        this.props.model.scale.multiplyScalar(scale);
+        this.props.model.updateMatrixWorld();
+
+        size *= scale;
+        center.multiplyScalar(scale);
+      }
+      size *= 1.5;
+
+      camera.position.copy(center)
+        .add(new THREE.Vector3(size/2, size/4, size));
+      camera.lookAt(center);
+      camera.updateMatrixWorld();
+
+      // const grid = new THREEGridHelper();
+      // scene.add(grid);
+
+      scene.add(this.props.model);
+
+      renderer.render(scene, camera);
+
+      console.log('loaded');
+    } else {
+      console.warn('error', 404, 'not found');
     }
-    const undersizeFactor = size;
-    if (undersizeFactor < 1) {
-      const scale = 1/undersizeFactor;
-      this.props.model.scale.multiplyScalar(scale);
-      this.props.model.updateMatrixWorld();
-
-      size *= scale;
-      center.multiplyScalar(scale);
-    }
-    size *= 1.5;
-
-    camera.position.copy(center)
-      .add(new THREE.Vector3(size/2, size/4, size));
-    camera.lookAt(center);
-    camera.updateMatrixWorld();
-
-    // const grid = new THREEGridHelper();
-    // scene.add(grid);
-
-    scene.add(this.props.model);
-
-    renderer.render(scene, camera);
-
-    console.log('loaded');
   }
 
   render() {
@@ -382,10 +386,10 @@ export default class App extends React.Component {
     }
     THREE.Texture = Texture;
 
-    const match = (getParameterByName('u', window.location.href) || '').match(/^([^\/]+)\/(.+?)\.([^\.]+)$/);
+    const match = (getParameterByName('u', window.location.href) || '').match(/^([^\/]+)\/(.+?)\/([^\.]+)$/);
     if (match) {
       const id = match[1];
-      const name = match[2] + '.' + match[3];
+      const name = match[2];
       const ext = match[3];
       const file = {
         ext,

@@ -16,8 +16,8 @@ const cache = new LRU({
 
 const app = express();
 app.use('/static', express.static(__dirname));
-app.get('/render', (req, res, next) => {
-  const {u} = req.query;
+app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
+  const u = `${req.params.fileId}/${req.params.fileName}/${req.params.ext}`;
 
   const entry = cache.get(u);
   if (entry) {
