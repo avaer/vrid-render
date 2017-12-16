@@ -19,33 +19,20 @@ app.use('/static', express.static(__dirname));
 app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
   const u = `${req.params.fileId}/${req.params.fileName}/${req.params.ext}`;
 
-  const entry = cache.get(u);
-  if (entry) {
-    res.type('image/jpeg');
-    res.set('Etag', entry.etag);
-    res.set('Cache-Control', `public, max-age=${maxAge}`);
-
-    if (req.headers['if-none-match'] === entry.etag) {
-      res.status(304);
-      res.end();
-    } else {
-      res.end(entry);
-    }
-  } else {
-    (async () => {
-      try {
+  let promise = cache.get(u);
+  if (!promise) {
+    promise = new Promise((accept, reject) => {
+      (async () => {
         const page = await browser.newPage();
         await page.setViewport({
           width: size,
           height: size,
         });
         page.on('error', err => {
-          res.status(500);
-          res.end(err.stack);
+          reject(err);
         });
         page.on('pageerror', err => {
-          res.status(500);
-          res.end(err.stack);
+          reject(err);
         });
         /* page.on('request', req => {
           console.log('request', req.url);
@@ -66,41 +53,49 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
             });
             buffer.etag = etag(buffer);
 
-            cache.set(u, buffer);
-
-            res.type('image/jpeg');
-            res.set('Etag', buffer.etag);
-            res.set('Cache-Control', `public, max-age=${maxAge}`);
-            if (req.headers['if-none-match'] === buffer.etag) {
-              res.status(304);
-              res.end();
-            } else {
-              res.end(buffer);
-            }
+            accept(buffer);
 
             page.close();
             clearTimeout(timeout);
           } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
-            res.status(msg.args[1]._remoteObject.value);
-            res.end(msg.args[2]._remoteObject.value);
+            const err = new Error(msg.args[2]._remoteObject.value);
+            err.statusCode = msg.args[1]._remoteObject.value;
+
+            reject(err);
 
             page.close();
             clearTimeout(timeout);
           }
         });
         const timeout = setTimeout(() => {
-          res.status(500);
-          res.end('timed out');
+          const err = new Error('timed out');
+          reject(err);
 
           page.close();
         }, 30 * 1000);
         await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
-      } catch(err) {
-        res.status(500);
-        res.end(err.stack);
-      }
-    })();
+      })()
+        .catch(reject);
+    });
+    cache.set(u, promise);
   }
+  promise
+    .then(buffer => {
+      res.type('image/jpeg');
+      res.set('Etag', buffer.etag);
+      res.set('Cache-Control', `public, max-age=${maxAge}`);
+
+      if (req.headers['if-none-match'] === buffer.etag) {
+        res.status(304);
+        res.end();
+      } else {
+        res.end(buffer);
+      }
+    })
+    .catch(err => {
+      res.status(err.statusCode || 500);
+      res.end(err.stack);
+    });
 });
 
 let browser = null;
