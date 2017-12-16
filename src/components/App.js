@@ -143,13 +143,6 @@ class TarLoader extends THREE.LoadingManager {
   }
 }
 const tarLoader = new TarLoader();
-THREE.Loader.Handlers.add(/\.dds$/i, (() => {
-  const loader = new THREEDDSLoader(tarLoader);
-  loader.load = (load => function(url, onLoad, onProgress, onError) {
-    return load.call(this, tarLoader.resolveURL(url), onLoad, onProgress, onError);
-  })(loader.load);
-  return loader;
-})());
 
 const _requestObj = (url, materials = null) => new Promise((accept, reject) => {
   const loader = new THREEOBJLoader(tarLoader);
@@ -333,6 +326,32 @@ export default class App extends React.Component {
       }
     }
     THREE.Texture = Texture;
+
+    THREE.Loader.Handlers.add(/\.dds$/i, (() => {
+      const loader = new THREEDDSLoader(tarLoader);
+      loader.load = (load => function(url, onLoad, onProgress, onError) {
+        self.setState({
+          pending: self.state.pending + 1,
+        });
+
+        return load.call(this, tarLoader.resolveURL(url), function() {
+          self.setState({
+            pending: self.state.pending - 1,
+          });
+
+          onLoad && onLoad.apply(this, arguments);
+        }, function() {
+          onProgress && onProgress.apply(this, arguments);
+        }, function() {
+          self.setState({
+            pending: self.state.pending - 1,
+          });
+
+          onError && onError.apply(this, arguments);
+        });
+      })(loader.load);
+      return loader;
+    })());
 
     const match = (getParameterByName('u', window.location.href) || '').match(/^([^\/]+)\/(.+?)\/([^\.]+)$/);
     if (match) {
