@@ -29,6 +29,8 @@ const _requestTicket = fn => {
   } else {
     queue.push(fn);
   }
+
+  console.log('request ticket queue length', queue.length);
 };
 
 const app = express();
