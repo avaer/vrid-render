@@ -147,7 +147,6 @@ class TarLoader extends THREE.LoadingManager {
     super();
 
     this.setURLModifier(url => {
-// console.log('load url', url, new Error().stack);
       if (/^(?:blob:|^https:\/\/)/.test(url)) {
         return url;
       } else {
@@ -177,7 +176,7 @@ class TarLoader extends THREE.LoadingManager {
       }
     };
     this.onError = url => {
-      console.log('error', url);
+      console.log('error', 404, `failed to load file: ${url}`);
 
       if (/blob:/.test(url)) {
         URL.revokeObjectURL(url);
@@ -333,6 +332,8 @@ class Scene extends React.Component {
     scene.add(this.props.model);
 
     renderer.render(scene, camera);
+
+    console.log('loaded');
   }
 
   render() {
@@ -372,7 +373,7 @@ export default class App extends React.Component {
           });
         });
         img.addEventListener('error', err => {
-          console.warn(err);
+          console.log('error', 404, `failed to load image: ${img.src}`);
 
           self.setState({
             pending: self.state.pending - 1,
@@ -382,127 +383,134 @@ export default class App extends React.Component {
     }
     THREE.Texture = Texture;
 
+    const match = (getParameterByName('u', window.location.href) || '').match(/^([^\/]+)\/(.+?)\.([^\.]+)$/);
+    if (match) {
+      const id = match[1];
+      const name = match[2] + '.' + match[3];
+      const ext = match[3];
+      const file = {
+        ext,
+        file: {
+          id,
+          name,
+        },
+      };
 
-    const id = getParameterByName('id', window.location.href);
-    const name = getParameterByName('name', window.location.href);
-    const ext = name.match(/\.([^\.]+)$/)[1];
-    const file = {
-      ext,
-      file: {
-        id,
-        name,
-      },
-    };
+      const _subDefaultTextures = (model, files) => {
+        const defaultImageFile = files.find(file => _isImageFileName(file.name));
+        if (defaultImageFile) {
+          const _recurse = o => {
+            if (o.constructor === THREE.Mesh && !o.material.map) {
+              o.material.map = _getFileTexture(defaultImageFile);
+            }
 
-    const _subDefaultTextures = (model, files) => {
-      const defaultImageFile = files.find(file => _isImageFileName(file.name));
-      if (defaultImageFile) {
-        const _recurse = o => {
-          if (o.constructor === THREE.Mesh && !o.material.map) {
-            o.material.map = _getFileTexture(defaultImageFile);
-          }
+            for (let i = 0; i < o.children.length; i++) {
+              _recurse(o.children[i]);
+            }
+          };
+          _recurse(model);
+        }
+      };
+      const _requestPreview = () => {
+        if (file) {
+          if (/obj/i.test(file.ext)) {
+            return _requestObj(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
+          } else if (/dae/i.test(file.ext)) {
+            return _requestDae(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
+          } else if (/fbx/i.test(file.ext)) {
+            return _requestFbx(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
+          } else if (/gltf/i.test(file.ext)) {
+            return _requestGltf(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
+          } else if (file.ext === 'tar') {
+            return fetch(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`)
+              .then(res => {
+                return res;
+              })
+              .then(_resArrayBuffer)
+              .then(untar)
+              .then(tarFiles => {
+                let modelFile = null;
+                let loader = null;
 
-          for (let i = 0; i < o.children.length; i++) {
-            _recurse(o.children[i]);
-          }
-        };
-        _recurse(model);
-      }
-    };
-    const _requestPreview = () => {
-      if (file) {
-        if (/obj/i.test(file.ext)) {
-          return _requestObj(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
-        } else if (/dae/i.test(file.ext)) {
-          return _requestDae(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
-        } else if (/fbx/i.test(file.ext)) {
-          return _requestFbx(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
-        } else if (/gltf/i.test(file.ext)) {
-          return _requestGltf(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`);
-        } else if (file.ext === 'tar') {
-          return fetch(`https://my-site.zeovr.io/files/${file.file.id}/${file.file.name}`)
-            .then(_resArrayBuffer)
-            .then(untar)
-            .then(tarFiles => {
-              let modelFile = null;
-              let loader = null;
+                const texturePath = String(texturePathId++) + '/';
+                tarLoader.setFiles(texturePath, tarFiles);
 
-              const texturePath = String(texturePathId++) + '/';
-              tarLoader.setFiles(texturePath, tarFiles);
+                if (modelFile = tarFiles.find(({name}) => /\.obj$/i.test(name))) {
+                  const materialFile = tarFiles.find(({name}) => /\.mtl$/i.test(name))
 
-              if (modelFile = tarFiles.find(({name}) => /\.obj$/i.test(name))) {
-                const materialFile = tarFiles.find(({name}) => /\.mtl$/i.test(name))
+                  if (materialFile) {
+                    const materialFileUrl = materialFile.getBlobUrl();
 
-                if (materialFile) {
-                  const materialFileUrl = materialFile.getBlobUrl();
+                    loader = modelFileUrl => _requestMtl(materialFileUrl, texturePath)
+                      .then(materials => {
+                        URL.revokeObjectURL(materialFileUrl);
 
-                  loader = modelFileUrl => _requestMtl(materialFileUrl, texturePath)
-                    .then(materials => {
-                      URL.revokeObjectURL(materialFileUrl);
+                        return _requestObj(modelFileUrl, materials);
+                      })
+                      .catch(err => {
+                        URL.revokeObjectURL(materialFileUrl);
 
-                      return _requestObj(modelFileUrl, materials);
+                        return Promise.reject(err);
+                      });
+                  } else {
+                    loader = _requestObj;
+                  }
+                } else if (modelFile = tarFiles.find(({name}) => /\.dae$/i.test(name))) {
+                  loader = _requestDae;
+                } else if (modelFile = tarFiles.find(({name}) => /\.fbx$/i.test(name))) {
+                  loader = _requestFbx;
+                } else if (modelFile = tarFiles.find(({name}) => /\.gltf$/i.test(name))) {
+                  loader = url => _requestGltf(url, texturePath);
+                }
+
+                if (modelFile) {
+                  const modelFileUrl = modelFile.getBlobUrl();
+
+                  return loader(modelFileUrl)
+                    .then(preview => {
+                      URL.revokeObjectURL(modelFileUrl);
+                      tarLoader.clearFiles(texturePath);
+
+                      _subDefaultTextures(preview, tarFiles);
+
+                      return preview;
                     })
                     .catch(err => {
-                      URL.revokeObjectURL(materialFileUrl);
+                      URL.revokeObjectURL(modelFileUrl);
+                      tarLoader.clearFiles(texturePath);
 
                       return Promise.reject(err);
                     });
                 } else {
-                  loader = _requestObj;
+                  tarLoader.clearFiles(texturePath);
+
+                  return Promise.resolve(null);
                 }
-              } else if (modelFile = tarFiles.find(({name}) => /\.dae$/i.test(name))) {
-                loader = _requestDae;
-              } else if (modelFile = tarFiles.find(({name}) => /\.fbx$/i.test(name))) {
-                loader = _requestFbx;
-              } else if (modelFile = tarFiles.find(({name}) => /\.gltf$/i.test(name))) {
-                loader = url => _requestGltf(url, texturePath);
-              }
-
-              if (modelFile) {
-                const modelFileUrl = modelFile.getBlobUrl();
-
-                return loader(modelFileUrl)
-                  .then(preview => {
-                    URL.revokeObjectURL(modelFileUrl);
-                    tarLoader.clearFiles(texturePath);
-
-                    _subDefaultTextures(preview, tarFiles);
-
-                    return preview;
-                  })
-                  .catch(err => {
-                    URL.revokeObjectURL(modelFileUrl);
-                    tarLoader.clearFiles(texturePath);
-
-                    return Promise.reject(err);
-                  });
-              } else {
-                tarLoader.clearFiles(texturePath);
-
-                return Promise.resolve(null);
-              }
-            });
+              });
+          } else {
+            return Promise.resolve(null);
+          }
         } else {
           return Promise.resolve(null);
         }
-      } else {
-        return Promise.resolve(null);
-      }
-    };
-    _requestPreview()
-      .then(preview => {
-        this.setState({
-          pending: this.state.pending - 1,
-          preview,
-        });
-      })
-      .catch(err => {
-        console.warn(err);
+      };
+      _requestPreview()
+        .then(preview => {
+          this.setState({
+            pending: this.state.pending - 1,
+            preview,
+          });
+        })
+        .catch(err => {
+          console.warn('error', 500, err.stack);
 
-        this.setState({
-          pending: this.state.pending - 1,
+          this.setState({
+            pending: this.state.pending - 1,
+          });
         });
-      });
+    } else {
+      console.warn('error', 400, 'failed to parse url');
+    }
   }
 
   render() {
