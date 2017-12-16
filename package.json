@@ -14,8 +14,10 @@
   "author": "Avaer Kazmer <a@modules.io>",
   "license": "MIT",
   "dependencies": {
+    "etag": "^1.8.1",
     "express": "^4.16.2",
     "js-untar": "^0.1.5",
+    "lru-cache": "^4.1.1",
     "prop-types": "^15.6.0",
     "puppeteer": "^0.13.0",
     "react": "^16.1.1",
