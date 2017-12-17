@@ -5,7 +5,7 @@ const etag = require('etag');
 const puppeteer = require('puppeteer');
 
 const port = process.env['PORT'] || 8080;
-const size = 1280;
+const size = 640;
 const maxAge = 10 * 60 * 1000;
 
 const LRU = require('lru-cache');
@@ -73,7 +73,7 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
           page.on('console', async msg => {
             if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'loaded') {
               const buffer = await page.screenshot({
-                type: 'jpeg',
+                // type: 'jpeg',
                 omitBackground: true,
               });
               buffer.etag = etag(buffer);
@@ -119,7 +119,7 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
   }
   promise
     .then(buffer => {
-      res.type('image/jpeg');
+      res.type('image/png');
       res.set('Etag', buffer.etag);
       res.set('Cache-Control', `public, max-age=${maxAge}`);
 
