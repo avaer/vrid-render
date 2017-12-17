@@ -74,6 +74,7 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
             if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'loaded') {
               const buffer = await page.screenshot({
                 type: 'jpeg',
+                omitBackground: true,
               });
               buffer.etag = etag(buffer);
 
