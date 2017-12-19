@@ -2,7 +2,12 @@ const http = require('http');
 
 const express = require('express');
 const etag = require('etag');
+const modulequery = require('modulequery');
 const puppeteer = require('puppeteer');
+
+const font = require('./font');
+
+const mq = modulequery();
 
 const port = process.env['PORT'] || 8080;
 const size = 640;
@@ -133,6 +138,66 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
     .catch(err => {
       res.status(err.statusCode || 500);
       res.end(err.stack);
+    });
+});
+
+app.get('/readme/:name/:version', (req, res, next) => {
+  const {name, version} = req.params;
+  const width = parseInt(req.query.width, 10) || 640;
+  const height = parseInt(req.query.height, 10) || 480;
+  const devicePixelRatio = parseInt(req.query.devicePixelRatio, 10) || 1;
+
+  mq.getModule(name)
+    .then(modSpec => {
+      browser.newPage()
+        .then(page => {
+          return page.setViewport({
+            width,
+            height,
+            deviceScaleFactor: devicePixelRatio,
+          })
+          .then(() => page.goto(
+            `data:text/html,\
+              <!doctype html>\
+              <html>\
+                <head>\
+                  <style>
+                    ${font}
+                    body {
+                      font-family: 'Open Sans';
+                      line-height: 1.4;
+                    }
+                    a {
+                      color: '2196F3';
+                    }
+                  </style>
+                </head>
+                <body>
+                  ${modSpec.readme || '<div style="margin: 50px 0; font-size: 40px; text-align: center;">No readme</div>'}
+                </body>
+              </html>`
+            ))
+            .then(() => page.screenshot({
+              type: 'png',
+              fullPage: true,
+            }))
+            .then(screenshot => {
+              res.type('image/png');
+              res.end(screenshot);
+
+              page.close();
+            })
+            .catch(err => {
+              res.status(500);
+              res.end();
+
+              page.close();
+            });
+        });
+    })
+    .catch(err => {
+      res.status(err.statusCode || 500);
+      res.send(err.stack);
     });
 });
 
