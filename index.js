@@ -14,7 +14,11 @@ const size = 640;
 const maxAge = 10 * 60 * 1000;
 
 const LRU = require('lru-cache');
-const cache = new LRU({
+const renderCache = new LRU({
+  max: 100,
+  maxAge,
+});
+const spectateCache = new LRU({
   max: 100,
   maxAge,
 });
@@ -43,7 +47,7 @@ app.use('/static', express.static(__dirname));
 app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
   const u = `${req.params.fileId}/${req.params.fileName}/${req.params.ext}`;
 
-  let promise = cache.get(u);
+  let promise = renderCache.get(u);
   if (!promise) {
     promise = new Promise((accept, reject) => {
       _requestTicket(next => {
@@ -120,7 +124,7 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
           });
       });
     });
-    cache.set(u, promise);
+    renderCache.set(u, promise);
   }
   promise
     .then(buffer => {
@@ -198,6 +202,111 @@ app.get('/readme/:name/:version', (req, res, next) => {
     .catch(err => {
       res.status(err.statusCode || 500);
       res.send(err.stack);
+    });
+});
+
+app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
+  const {protocol, host} = req.params;
+  const port = parseInt(req.params.port, 10);
+
+  const captureTime = 5000;
+  const u = `${protocol}://${host}:${port}/?s=1&c=${captureTime}`;
+
+  let promise = spectateCache.get(u);
+  if (!promise) {
+    promise = new Promise((accept, reject) => {
+      _requestTicket(next => {
+        (async () => {
+          const page = await browser.newPage();
+          await page.setViewport({
+            width: size,
+            height: size,
+          });
+          page.on('error', err => {
+            reject(err);
+
+            next();
+          });
+          page.on('pageerror', err => {
+            reject(err);
+
+            next();
+          });
+          /* page.on('request', req => {
+            console.log('request', req.url);
+          });
+          page.on('response', res => {
+            console.log('response', res.url);
+          });
+          page.on('requestfinished', req => {
+            console.log('requestfinished', req.url);
+          });
+          page.on('requestfailed', err => {
+            console.log('request failed', err);
+          });  */
+          const bs = [];
+          page.on('console', async msg => {
+            if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
+              bs.push(new Buffer(msg.args[1]._remoteObject.value, 'base64'));
+            } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
+              const b = Buffer.concat(bs);
+              b.etag = etag(b);
+
+              accept(b);
+
+              page.close();
+              clearTimeout(timeout);
+
+              next();
+            } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
+              const err = new Error(msg.args[2]._remoteObject.value);
+              err.statusCode = msg.args[1]._remoteObject.value;
+
+              reject(err);
+
+              page.close();
+              clearTimeout(timeout);
+
+              next();
+            } else {
+              console.log(msg.text);
+            }
+          });
+          const timeout = setTimeout(() => {
+            const err = new Error('timed out');
+            reject(err);
+
+            page.close();
+
+            next();
+          }, 30 * 1000);
+          await page.goto(u);
+        })()
+          .catch(err => {
+            reject(err);
+
+            next();
+          });
+      });
+    });
+    spectateCache.set(u, promise);
+  }
+  promise
+    .then(buffer => {
+      res.type('video/webm');
+      res.set('Etag', buffer.etag);
+      res.set('Cache-Control', `public, max-age=${maxAge}`);
+
+      if (req.headers['if-none-match'] === buffer.etag) {
+        res.status(304);
+        res.end();
+      } else {
+        res.end(buffer);
+      }
+    })
+    .catch(err => {
+      res.status(err.statusCode || 500);
+      res.end(err.stack);
     });
 });
 
