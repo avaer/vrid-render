@@ -173,10 +173,9 @@ app.get('/readme/:name/:version', (req, res, next) => {
               fullPage: true,
             }))
             .then(screenshot => {
-              res.type('image/png');
-              res.end(screenshot);
-
               page.close();
+
+              return screenshot;
             })
             .catch(err => {
               res.status(500);
@@ -185,6 +184,10 @@ app.get('/readme/:name/:version', (req, res, next) => {
               page.close();
             });
         });
+    })
+    .then(screenshot => {
+      res.type('image/png');
+      res.end(screenshot);
     })
     .catch(err => {
       res.status(err.statusCode || 500);
@@ -197,7 +200,9 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
   const port = parseInt(req.params.port, 10);
 
   const captureTime = 10 * 1000;
-  const u = `${protocol}://${host}:${port}/?s=1&c=${captureTime}`;
+
+  res.type('video/webm');
+  res.set('Cache-Control', `public, max-age=${maxAge}`);
 
   const promise = new Promise((accept, reject) => {
     _requestTicket(next => {
@@ -229,15 +234,11 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
         page.on('requestfailed', err => {
           console.log('request failed', err);
         });  */
-        const bs = [];
         page.on('console', async msg => {
           if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
-            bs.push(new Buffer(msg.args[1]._remoteObject.value, 'base64'));
+            res.write(new Buffer(msg.args[1]._remoteObject.value, 'base64'));
           } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
-            const b = Buffer.concat(bs);
-            b.etag = etag(b);
-
-            accept(b);
+            accept();
 
             page.close();
             clearTimeout(timeout);
@@ -265,7 +266,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
 
           next();
         }, 10 * 1000 + captureTime);
-        await page.goto(u);
+        await page.goto(`${protocol}://${host}:${port}/?s=1&c=${captureTime}`);
       })()
         .catch(err => {
           reject(err);
@@ -275,17 +276,8 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
     });
   });
   promise
-    .then(buffer => {
-      res.type('video/webm');
-      res.set('Etag', buffer.etag);
-      res.set('Cache-Control', `public, max-age=${maxAge}`);
-
-      if (req.headers['if-none-match'] === buffer.etag) {
-        res.status(304);
-        res.end();
-      } else {
-        res.end(buffer);
-      }
+    .then(() => {
+      res.end();
     })
     .catch(err => {
       res.status(err.statusCode || 500);
