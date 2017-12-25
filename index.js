@@ -14,7 +14,8 @@ const mq = modulequery();
 
 const port = process.env['PORT'] || 8080;
 const securePort = 443;
-const size = 640;
+const imageSize = 640;
+const videoSize = 320;
 const maxAge = 10 * 60 * 1000;
 
 let running = false;
@@ -47,8 +48,8 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
       (async () => {
         const page = await browser.newPage();
         await page.setViewport({
-          width: size,
-          height: size,
+          width: imageSize,
+          height: imageSize,
         });
         page.on('error', err => {
           reject(err);
@@ -108,7 +109,7 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
 
           next();
         }, 30 * 1000);
-        await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
+        await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${imageSize}`);
       })()
         .catch(err => {
           reject(err);
@@ -213,8 +214,8 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
       (async () => {
         const page = await browser.newPage();
         await page.setViewport({
-          width: size,
-          height: size,
+          width: videoSize,
+          height: videoSize,
         });
         page.on('error', err => {
           reject(err);
