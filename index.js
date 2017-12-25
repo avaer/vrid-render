@@ -209,7 +209,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
   const {protocol, host} = req.params;
   const port = parseInt(req.params.port, 10);
 
-  const captureTime = 5000;
+  const captureTime = 10 * 1000;
   const u = `${protocol}://${host}:${port}/?s=1&c=${captureTime}`;
 
   let promise = spectateCache.get(u);
@@ -279,7 +279,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
             page.close();
 
             next();
-          }, 30 * 1000);
+          }, 10 * 1000 + captureTime);
           await page.goto(u);
         })()
           .catch(err => {
