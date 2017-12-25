@@ -12,4 +12,4 @@ ADD . /root/render
 RUN bash -c 'cd /root/render && npm install --unsafe-perm'
 
 WORKDIR /root/render/
-ENTRYPOINT ["npm", "start"]
+CMD ["npm", "start"]
