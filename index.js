@@ -13,15 +13,6 @@ const port = process.env['PORT'] || 8080;
 const size = 640;
 const maxAge = 10 * 60 * 1000;
 
-const LRU = require('lru-cache');
-const renderCache = new LRU({
-  max: 100,
-  maxAge,
-});
-const spectateCache = new LRU({
-  max: 100,
-  maxAge,
-});
 let running = false;
 const queue = [];
 const _requestTicket = fn => {
@@ -47,85 +38,81 @@ app.use('/static', express.static(__dirname));
 app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
   const u = `${req.params.fileId}/${req.params.fileName}/${req.params.ext}`;
 
-  let promise = renderCache.get(u);
-  if (!promise) {
-    promise = new Promise((accept, reject) => {
-      _requestTicket(next => {
-        (async () => {
-          const page = await browser.newPage();
-          await page.setViewport({
-            width: size,
-            height: size,
-          });
-          page.on('error', err => {
-            reject(err);
+  const promise = new Promise((accept, reject) => {
+    _requestTicket(next => {
+      (async () => {
+        const page = await browser.newPage();
+        await page.setViewport({
+          width: size,
+          height: size,
+        });
+        page.on('error', err => {
+          reject(err);
+
+          next();
+        });
+        page.on('pageerror', err => {
+          reject(err);
+
+          next();
+        });
+        /* page.on('request', req => {
+          console.log('request', req.url);
+        });
+        page.on('response', res => {
+          console.log('response', res.url);
+        });
+        page.on('requestfinished', req => {
+          console.log('requestfinished', req.url);
+        });
+        page.on('requestfailed', err => {
+          console.log('request failed', err);
+        });  */
+        page.on('console', async msg => {
+          if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'loaded') {
+            const buffer = await page.screenshot({
+              // type: 'jpeg',
+              omitBackground: true,
+            });
+            buffer.etag = etag(buffer);
+
+            accept(buffer);
+
+            page.close();
+            clearTimeout(timeout);
 
             next();
-          });
-          page.on('pageerror', err => {
-            reject(err);
+          } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
+            const err = new Error(msg.args[2]._remoteObject.value);
+            err.statusCode = msg.args[1]._remoteObject.value;
 
-            next();
-          });
-          /* page.on('request', req => {
-            console.log('request', req.url);
-          });
-          page.on('response', res => {
-            console.log('response', res.url);
-          });
-          page.on('requestfinished', req => {
-            console.log('requestfinished', req.url);
-          });
-          page.on('requestfailed', err => {
-            console.log('request failed', err);
-          });  */
-          page.on('console', async msg => {
-            if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'loaded') {
-              const buffer = await page.screenshot({
-                // type: 'jpeg',
-                omitBackground: true,
-              });
-              buffer.etag = etag(buffer);
-
-              accept(buffer);
-
-              page.close();
-              clearTimeout(timeout);
-
-              next();
-            } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
-              const err = new Error(msg.args[2]._remoteObject.value);
-              err.statusCode = msg.args[1]._remoteObject.value;
-
-              reject(err);
-
-              page.close();
-              clearTimeout(timeout);
-
-              next();
-            } else {
-              console.log(msg.text);
-            }
-          });
-          const timeout = setTimeout(() => {
-            const err = new Error('timed out');
             reject(err);
 
             page.close();
+            clearTimeout(timeout);
 
             next();
-          }, 30 * 1000);
-          await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
-        })()
-          .catch(err => {
-            reject(err);
+          } else {
+            console.log(msg.text);
+          }
+        });
+        const timeout = setTimeout(() => {
+          const err = new Error('timed out');
+          reject(err);
 
-            next();
-          });
-      });
+          page.close();
+
+          next();
+        }, 30 * 1000);
+        await page.goto(`http://127.0.0.1:${port}/static?u=${encodeURIComponent(u)}&s=${size}`);
+      })()
+        .catch(err => {
+          reject(err);
+
+          next();
+        });
     });
-    renderCache.set(u, promise);
-  }
+  });
   promise
     .then(buffer => {
       res.type('image/png');
@@ -212,85 +199,81 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
   const captureTime = 10 * 1000;
   const u = `${protocol}://${host}:${port}/?s=1&c=${captureTime}`;
 
-  let promise = spectateCache.get(u);
-  if (!promise) {
-    promise = new Promise((accept, reject) => {
-      _requestTicket(next => {
-        (async () => {
-          const page = await browser.newPage();
-          await page.setViewport({
-            width: size,
-            height: size,
-          });
-          page.on('error', err => {
-            reject(err);
+  const promise = new Promise((accept, reject) => {
+    _requestTicket(next => {
+      (async () => {
+        const page = await browser.newPage();
+        await page.setViewport({
+          width: size,
+          height: size,
+        });
+        page.on('error', err => {
+          reject(err);
+
+          next();
+        });
+        page.on('pageerror', err => {
+          reject(err);
+
+          next();
+        });
+        /* page.on('request', req => {
+          console.log('request', req.url);
+        });
+        page.on('response', res => {
+          console.log('response', res.url);
+        });
+        page.on('requestfinished', req => {
+          console.log('requestfinished', req.url);
+        });
+        page.on('requestfailed', err => {
+          console.log('request failed', err);
+        });  */
+        const bs = [];
+        page.on('console', async msg => {
+          if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
+            bs.push(new Buffer(msg.args[1]._remoteObject.value, 'base64'));
+          } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
+            const b = Buffer.concat(bs);
+            b.etag = etag(b);
+
+            accept(b);
+
+            page.close();
+            clearTimeout(timeout);
 
             next();
-          });
-          page.on('pageerror', err => {
-            reject(err);
+          } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
+            const err = new Error(msg.args[2]._remoteObject.value);
+            err.statusCode = msg.args[1]._remoteObject.value;
 
-            next();
-          });
-          /* page.on('request', req => {
-            console.log('request', req.url);
-          });
-          page.on('response', res => {
-            console.log('response', res.url);
-          });
-          page.on('requestfinished', req => {
-            console.log('requestfinished', req.url);
-          });
-          page.on('requestfailed', err => {
-            console.log('request failed', err);
-          });  */
-          const bs = [];
-          page.on('console', async msg => {
-            if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
-              bs.push(new Buffer(msg.args[1]._remoteObject.value, 'base64'));
-            } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
-              const b = Buffer.concat(bs);
-              b.etag = etag(b);
-
-              accept(b);
-
-              page.close();
-              clearTimeout(timeout);
-
-              next();
-            } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
-              const err = new Error(msg.args[2]._remoteObject.value);
-              err.statusCode = msg.args[1]._remoteObject.value;
-
-              reject(err);
-
-              page.close();
-              clearTimeout(timeout);
-
-              next();
-            } else {
-              console.log(msg.text);
-            }
-          });
-          const timeout = setTimeout(() => {
-            const err = new Error('timed out');
             reject(err);
 
             page.close();
+            clearTimeout(timeout);
 
             next();
-          }, 10 * 1000 + captureTime);
-          await page.goto(u);
-        })()
-          .catch(err => {
-            reject(err);
+          } else {
+            console.log(msg.text);
+          }
+        });
+        const timeout = setTimeout(() => {
+          const err = new Error('timed out');
+          reject(err);
 
-            next();
-          });
-      });
+          page.close();
+
+          next();
+        }, 10 * 1000 + captureTime);
+        await page.goto(u);
+      })()
+        .catch(err => {
+          reject(err);
+
+          next();
+        });
     });
-    spectateCache.set(u, promise);
-  }
+  });
   promise
     .then(buffer => {
       res.type('video/webm');
