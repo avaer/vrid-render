@@ -1,4 +1,6 @@
+const path = require('path');
 const http = require('http');
+const https = require('https');
 
 const express = require('express');
 const etag = require('etag');
@@ -285,14 +287,47 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
     });
 });
 
+const _readFile = p => new Promise((accept, reject) => {
+  fs.readFile(p, (err, d) => {
+    if (!err) {
+      accept(d);
+    } else {
+      reject(err);
+    }
+  });
+});
+
 let browser = null;
-puppeteer.launch({
-  args: [
-    '--no-sandbox',
-    '--no-zygote',
-  ],
-})
-  .then(newBrowser => {
+Promise.all([
+  Promise.all([
+    _readFile(path.join('/', 'certs', 'cert.pem')),
+    _readFile(path.join('/', 'certs', 'key.pem')),
+  ])
+    .then(([
+      cert,
+      key,
+    ]) => ({
+      cert,
+      key,
+    }))
+    .catch(err => {
+      if (err.code === 'ENOENT') {
+        return Promise.resolve(null);
+      } else {
+        return Promise.reject(err);
+      }
+    }),
+  puppeteer.launch({
+    args: [
+      '--no-sandbox',
+      '--no-zygote',
+    ],
+  })
+])
+  .then(([
+    certs,
+    newBrowser,
+  ]) => {
     browser = newBrowser;
     const _disconnected = () => {
       const err = new Error('browser disconnected');
@@ -304,6 +339,17 @@ puppeteer.launch({
     server.listen(port, err => {
       if (!err) {
         console.log(`listening on http://0.0.0.0:${port}/`);
+      } else {
+        throw err;
+      }
+    });
+    const secureServer = https.createServer({
+      cert: certs.cert,
+      key: certs.key,
+    }, app);
+    secureServer.listen(err => {
+      if (!err) {
+        console.log(`listening on https://0.0.0.0/`);
       } else {
         throw err;
       }
