@@ -13,6 +13,7 @@ const font = require('./font');
 const mq = modulequery();
 
 const port = process.env['PORT'] || 8080;
+const securePort = 443;
 const size = 640;
 const maxAge = 10 * 60 * 1000;
 
@@ -348,9 +349,9 @@ Promise.all([
       cert: certs.cert,
       key: certs.key,
     }, app);
-    secureServer.listen(err => {
+    secureServer.listen(securePort, err => {
       if (!err) {
-        console.log(`listening on https://0.0.0.0/`);
+        console.log(`listening on https://0.0.0.0:${securePort}/`);
       } else {
         throw err;
       }
