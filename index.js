@@ -302,6 +302,7 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
             const ffmpeg = childProcess.spawn('ffmpeg', ['-framerate', '24', '-i', path.join(tempDir.path, 'frame%04d.jpg'), '-f', 'webm', 'pipe:1']);
             res.type('video/webm');
             ffmpeg.stdout.pipe(res, {end: false});
+            ffmpeg.stderr.pipe(process.stderr);
             ffmpeg.on('error', err => {
               reject(err);
 
