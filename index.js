@@ -283,7 +283,7 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
           if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
             const d = new Buffer(msg.args[1]._remoteObject.value.replace(/^.*?,/, ''), 'base64');
 
-            console.log('server preview stream frame', d.length);
+            // console.log('server preview stream frame', d.length);
 
             fs.writeFile(
               path.join(tempDir.path, 'frame' + _pad(frame++, 4) + '.jpg'),
@@ -300,7 +300,7 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
             const ffmpeg = childProcess.spawn('ffmpeg', ['-framerate', '24', '-i', path.join(tempDir.path, 'frame%04d.jpg'), '-f', 'webm', 'pipe:1']);
             res.type('video/webm');
             ffmpeg.stdout.pipe(res, {end: false});
-            ffmpeg.stderr.pipe(process.stderr);
+            // ffmpeg.stderr.pipe(process.stderr);
             ffmpeg.on('error', err => {
               reject(err);
 
@@ -397,7 +397,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
           if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
             const d = new Buffer(msg.args[1]._remoteObject.value, 'base64');
 
-            console.log('server spectate stream frame', d.length);
+            // console.log('server spectate stream frame', d.length);
 
             res.write(d);
           } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
