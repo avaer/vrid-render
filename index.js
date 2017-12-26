@@ -134,8 +134,7 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
           }
         });
         const timeout = setTimeout(() => {
-          const err = new Error('timed out');
-          reject(err);
+          reject(new Error('timed out'));
 
           page.close();
 
@@ -286,31 +285,31 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
           if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
             const d = new Buffer(msg.args[1]._remoteObject.value.replace(/^.*?,/, ''), 'base64');
 
-            console.log('server preview frame', d.length);
+            console.log('server preview stream frame', d.length);
 
             fs.writeFile(
               path.join(tempDir.path, 'frame' + _pad(frame++, 4) + '.jpg'),
               d,
               err => {
                 if (err) {
-                  console.warn(err);
+                  console.warn('server preview frame write error', err);
                 }
               }
             );
           } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
-            console.log('server preview end');
+            console.log('server preview stream end');
 
             const ffmpeg = childProcess.spawn('ffmpeg', ['-framerate', '24', '-i', path.join(tempDir.path, 'frame%04d.jpg'), '-f', 'webm', 'pipe:1']);
             res.type('video/webm');
             ffmpeg.stdout.pipe(res, {end: false});
             ffmpeg.on('error', err => {
-              console.warn(err);
-
-              accept();
+              accept(err);
 
               next();
             });
             ffmpeg.on('close', () => {
+              console.log('server preview encode end');
+
               accept();
 
               next();
@@ -333,8 +332,7 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
           }
         });
         const timeout = setTimeout(() => {
-          const err = new Error('timed out');
-          reject(err);
+          reject(new Error('timed out'));
 
           page.close();
 
@@ -400,8 +398,14 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
         });  */
         page.on('console', async msg => {
           if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
-            res.write(new Buffer(msg.args[1]._remoteObject.value, 'base64'));
+            const d = new Buffer(msg.args[1]._remoteObject.value, 'base64');
+
+            console.log('server spectate stream frame', d.length);
+
+            res.write(d);
           } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
+            console.log('server spectate stream end');
+
             accept();
 
             page.close();
@@ -423,8 +427,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
           }
         });
         const timeout = setTimeout(() => {
-          const err = new Error('timed out');
-          reject(err);
+          reject(new Error('timed out'));
 
           page.close();
 
