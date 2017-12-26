@@ -2,9 +2,12 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const childProcess = require('child_process');
 
 const express = require('express');
 const etag = require('etag');
+const tmp = require('tmp');
+const rimraf = require('rimraf');
 const modulequery = require('modulequery');
 const puppeteer = require('puppeteer');
 
@@ -15,7 +18,7 @@ const mq = modulequery();
 const port = process.env['PORT'] || 8080;
 const securePort = 443;
 const imageSize = 640;
-const videoSize = 320;
+const videoSize = 480;
 const maxAge = 10 * 60 * 1000;
 
 let running = false;
@@ -37,6 +40,35 @@ const _requestTicket = fn => {
 
   console.log('request ticket queue length', queue.length);
 };
+class TempDir {
+  constructor(path, cleanup) {
+    this.path = path;
+    this.cleanup = cleanup;
+  }
+}
+const _requestTempDir = () => new Promise((accept, reject) => {
+  tmp.dir({
+    keep: true,
+  }, (err, path) => {
+    if (!err) {
+      accept(new TempDir(path, () => new Promise((accept, reject) => {
+        rimraf(path, err => {
+          if (!err) {
+            accept();
+          } else {
+            reject(err);
+          }
+        });
+      })));
+    } else {
+      reject(err);
+    }
+  });
+});
+function _pad(n, width) {
+  n = n + '';
+  return n.length >= width ? n : Array(width - n.length + 1).join('0') + n;
+}
 
 const app = express();
 app.use('/static', express.static(__dirname));
@@ -200,6 +232,127 @@ app.get('/readme/:name/:version', (req, res, next) => {
     });
 });
 
+app.get('/preview/:protocol/:host/:port', (req, res, next) => {
+  const {protocol, host} = req.params;
+  const port = parseInt(req.params.port, 10);
+
+  const captureTime = 10 * 1000;
+
+  res.type('video/webm');
+  res.set('Cache-Control', `public, max-age=${maxAge}`);
+
+  const promise = new Promise((accept, reject) => {
+    _requestTicket(next => {
+      (async () => {
+        const tempDir = await _requestTempDir();
+        next = (next => () => {
+          tempDir.cleanup()
+            .catch(err => {
+              console.warn(err);
+            });
+
+          next();
+        })(next);
+
+        const page = await browser.newPage();
+        await page.setViewport({
+          width: videoSize,
+          height: videoSize,
+        });
+        page.on('error', err => {
+          reject(err);
+
+          next();
+        });
+        page.on('pageerror', err => {
+          reject(err);
+
+          next();
+        });
+        /* page.on('request', req => {
+          console.log('request', req.url);
+        });
+        page.on('response', res => {
+          console.log('response', res.url);
+        });
+        page.on('requestfinished', req => {
+          console.log('requestfinished', req.url);
+        });
+        page.on('requestfailed', err => {
+          console.log('request failed', err);
+        });  */
+        let frame = 0;
+        page.on('console', async msg => {
+          if (msg.type === 'log' && msg.args.length === 2 && msg.args[0]._remoteObject.value === 'data') {
+            fs.writeFile(
+              path.join(tempDir.path, 'frame' + _pad(frame++, 4) + '.jpg'),
+              new Buffer(msg.args[1]._remoteObject.value.replace(/^.*?,/, ''), 'base64'),
+              err => {
+                if (err) {
+                  console.warn(err);
+                }
+              }
+            );
+          } else if (msg.type === 'log' && msg.args.length === 1 && msg.args[0]._remoteObject.value === 'end') {
+            const ffmpeg = childProcess.spawn('ffmpeg', ['-framerate', '24', '-i', path.join(tempDir.path, 'frame%04d.jpg'), '-f', 'webm', 'pipe:1']);
+            res.type('video/webm');
+            ffmpeg.stdout.pipe(res, {end: false});
+            ffmpeg.on('error', err => {
+              console.warn(err);
+
+              accept();
+
+              next();
+            });
+            ffmpeg.on('close', () => {
+              accept();
+
+              next();
+            });
+
+            page.close();
+            clearTimeout(timeout);
+          } else if (msg.type === 'warning' && msg.args.length === 3 && msg.args[0]._remoteObject.value === 'error') {
+            const err = new Error(msg.args[2]._remoteObject.value);
+            err.statusCode = msg.args[1]._remoteObject.value;
+
+            reject(err);
+
+            page.close();
+            clearTimeout(timeout);
+
+            next();
+          } else {
+            console.log(msg.text);
+          }
+        });
+        const timeout = setTimeout(() => {
+          const err = new Error('timed out');
+          reject(err);
+
+          page.close();
+
+          next();
+        }, 10 * 1000 + captureTime);
+        await page.goto(`${protocol}://${host}:${port}/?ci=1`);
+      })()
+        .catch(err => {
+          reject(err);
+
+          next();
+        });
+    });
+  });
+  promise
+    .then(() => {
+      res.end();
+    })
+    .catch(err => {
+      res.status(err.statusCode || 500);
+      res.end(err.stack);
+    });
+});
+
 app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
   const {protocol, host} = req.params;
   const port = parseInt(req.params.port, 10);
@@ -271,7 +424,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
 
           next();
         }, 10 * 1000 + captureTime);
-        await page.goto(`${protocol}://${host}:${port}/?s=1&c=${captureTime}`);
+        await page.goto(`${protocol}://${host}:${port}/?cv=1`);
       })()
         .catch(err => {
           reject(err);
