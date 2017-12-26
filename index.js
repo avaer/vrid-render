@@ -9,11 +9,13 @@ const etag = require('etag');
 const tmp = require('tmp');
 const rimraf = require('rimraf');
 const modulequery = require('modulequery');
+const dockerode = require('dockerode');
 const puppeteer = require('puppeteer');
 
 const font = require('./font');
 
 const mq = modulequery();
+const docker = dockerode();
 
 const port = process.env['PORT'] || 8080;
 const securePort = 443;
@@ -449,6 +451,102 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
     });
 });
 
+let bundlePromise = null;
+let bundleQueued = false;
+let bundlePort = null;
+const _refreshBundle = () => {
+  if (!bundlePromise) {
+    bundlePromise = new Promise((accept, reject) => {
+      docker.listContainers((err, containers) => {
+        if (!err) {
+          const oldBundleContainers = containers.filter(containerSpec => containerSpec.Image === 'modulesio/zeo:latest');
+
+          docker.pull('modulesio/zeo:latest', err => {
+            if (!err) {
+              docker.createContainer({
+                Image: 'modulesio/zeo:latest',
+                Cmd: ['/root/zeo/scripts/offline.sh'],
+                ExposedPorts: {
+                  '8000/tcp': {},
+                },
+                PortBindings: {
+                  '8000/tcp': [{ 'HostPort': '' }],
+                },
+              }, (err, container) => {
+                if (!err) {
+                  container.start(err => {
+                    if (!err) {
+                      container.inspect((err, containerSpec) => {
+                        if (!err) {
+                          bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
+
+                          Promise.all(oldBundleContainers.map(oldBundleContainerSpec => new Promise((accept, reject) => {
+                            docker.getContainer(oldBundleContainerSpec.Id).remove({
+                              force: true,
+                            }, err => {
+                              if (!err) {
+                                accept();
+                              } else {
+                                reject(err);
+                              }
+                            });
+                          })))
+                            .then(() => {
+                              accept();
+                            }, reject);
+                        } else {
+                          reject(err);
+                        }
+                      });
+                    } else {
+                      reject(err);
+                    }
+                  });
+                } else {
+                  reject(err);
+                }
+              });
+            } else {
+              reject(err);
+            }
+          });
+        } else {
+          reject(err);
+        }
+      });
+    })
+    .then(() => {
+      bundlePromise = null;
+
+      if (bundleQueued) {
+        bundleQueued = false;
+
+        _refreshBundle();
+      }
+    })
+    .catch(err => {
+      bundlePromise = null;
+
+      return Promise.reject(err);
+    });
+  } else {
+    bundleQueued = true;
+  }
+
+  return bundlePromise;
+};
+_refreshBundle()
+  .catch(err => {
+    console.warn(err);
+  });
+app.post('/webhooks/docker/zeo', (req, res, next) => {
+  console.log('got bundle webhook');
+
+  _refreshBundle();
+
+  res.end();
+});
+
 const _requestBrowser = () => puppeteer.launch({
   args: [
     '--no-sandbox',
@@ -464,7 +562,6 @@ const _readFile = p => new Promise((accept, reject) => {
     }
   });
 });
-
 let browser = null;
 Promise.all([
   Promise.all([
