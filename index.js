@@ -346,17 +346,19 @@ Promise.all([
         throw err;
       }
     });
-    const secureServer = https.createServer({
-      cert: certs.cert,
-      key: certs.key,
-    }, app);
-    secureServer.listen(securePort, err => {
-      if (!err) {
-        console.log(`listening on https://0.0.0.0:${securePort}/`);
-      } else {
-        throw err;
-      }
-    });
+    if (certs) {
+      const secureServer = https.createServer({
+        cert: certs.cert,
+        key: certs.key,
+      }, app);
+      secureServer.listen(securePort, err => {
+        if (!err) {
+          console.log(`listening on https://0.0.0.0:${securePort}/`);
+        } else {
+          throw err;
+        }
+      });
+    }
 
     const _sigterm = () => {
       browser.removeListener('disconnected', _disconnected);
