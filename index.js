@@ -235,8 +235,6 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
   const {protocol, host} = req.params;
   const port = parseInt(req.params.port, 10);
 
-  const captureTime = 10 * 1000;
-
   res.type('video/webm');
   res.set('Cache-Control', `public, max-age=${maxAge}`);
 
@@ -338,7 +336,7 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
           page.close();
 
           next();
-        }, 10 * 1000 + captureTime);
+        }, 1 * 60 * 1000);
         await page.goto(`${protocol}://${host}:${port}/?ci=1`);
       })()
         .catch(err => {
@@ -361,8 +359,6 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
 app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
   const {protocol, host} = req.params;
   const port = parseInt(req.params.port, 10);
-
-  const captureTime = 10 * 1000;
 
   res.type('video/webm');
   res.set('Cache-Control', `public, max-age=${maxAge}`);
@@ -433,7 +429,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
           page.close();
 
           next();
-        }, 10 * 1000 + captureTime);
+        }, 1 * 60 * 1000);
         await page.goto(`${protocol}://${host}:${port}/?cv=1`);
       })()
         .catch(err => {
