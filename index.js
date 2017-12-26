@@ -443,6 +443,12 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
     });
 });
 
+const _requestBrowser = () => puppeteer.launch({
+  args: [
+    '--no-sandbox',
+    '--no-zygote',
+  ],
+});
 const _readFile = p => new Promise((accept, reject) => {
   fs.readFile(p, (err, d) => {
     if (!err) {
@@ -473,12 +479,7 @@ Promise.all([
         return Promise.reject(err);
       }
     }),
-  puppeteer.launch({
-    args: [
-      '--no-sandbox',
-      '--no-zygote',
-    ],
-  })
+  _requestBrowser(),
 ])
   .then(([
     certs,
@@ -486,8 +487,16 @@ Promise.all([
   ]) => {
     browser = newBrowser;
     const _disconnected = () => {
-      const err = new Error('browser disconnected');
-      throw err;
+      console.warn(new Error('browser disconnected, restarting...'));
+
+      _requestBrowser()
+        .then(() => {
+          browser = newBrowser;
+          browser.on('disconnected', _disconnected);
+        })
+        .catch(err => {
+          throw err; // nothing else we can do
+        });
     };
     browser.on('disconnected', _disconnected);
 
