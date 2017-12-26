@@ -303,7 +303,7 @@ app.get('/preview/:protocol/:host/:port', (req, res, next) => {
             res.type('video/webm');
             ffmpeg.stdout.pipe(res, {end: false});
             ffmpeg.on('error', err => {
-              accept(err);
+              reject(err);
 
               next();
             });
