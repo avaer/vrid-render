@@ -475,6 +475,8 @@ let bundleQueued = false;
 let bundlePort = null;
 const _refreshBundle = () => {
   if (!bundlePromise) {
+    console.log('refreshing bundle');
+
     bundlePromise = new Promise((accept, reject) => {
       docker.listContainers((err, containers) => {
         if (!err) {
@@ -541,6 +543,8 @@ const _refreshBundle = () => {
       });
     })
     .then(() => {
+      console.log('successfully refreshed bundle');
+
       bundlePromise = null;
 
       if (bundleQueued) {
