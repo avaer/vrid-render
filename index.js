@@ -473,6 +473,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
 app.get('/release.tar.gz', (req, res, next) => {
   if (bundleTgz !== null) {
     res.type('application/gzip');
+    res.set('Content-Length', bundleTgz.size);
 
     const _recurse = (i = 0) => {
       if (i < bundleTgz.length) {
@@ -536,13 +537,15 @@ const _refreshBundle = () => {
                             Promise.all([
                               new Promise((accept, reject) => {
                                 const newBundleTgz = [];
+                                newBundleTgz.size = 0;
+
                                 const cp = childProcess.spawn('bash', ['-c', `docker cp ${containerId}:/root/zeo - | bsdtar -czf - --exclude=zeo/data @-`]);
                                 cp.stdout.on('data', d => {
                                   newBundleTgz.push(d);
+                                  newBundleTgz.size += d.length;
                                 });
                                 cp.stdout.on('end', () => {
                                   bundleTgz = newBundleTgz;
-                                  console.log('bundle size', bundleTgz.length);
 
                                   accept();
                                 });
