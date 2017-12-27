@@ -480,6 +480,12 @@ app.get('/release.tar.gz', (req, res, next) => {
     res.type('application/gzip');
     // cp.stderr.pipe(process.stderr);
     cp.stdout.pipe(res);
+
+    req.on('aborted', () => {
+      console.log('aborted');
+
+      cp.kill();
+    });
   } else {
     res.status(404);
     res.end(http.STATUS_CODES[404]);
