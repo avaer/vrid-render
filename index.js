@@ -480,50 +480,56 @@ const _refreshBundle = () => {
         if (!err) {
           const oldBundleContainers = containers.filter(containerSpec => containerSpec.Image === 'modulesio/zeo:latest');
 
-          docker.pull('modulesio/zeo:latest', err => {
+          docker.pull('modulesio/zeo:latest', (err, stream) => {
             if (!err) {
-              docker.createContainer({
-                Image: 'modulesio/zeo:latest',
-                Cmd: ['/root/zeo/scripts/offline.sh'],
-                ExposedPorts: {
-                  '8000/tcp': {},
-                },
-                PortBindings: {
-                  '8000/tcp': [{ 'HostPort': '' }],
-                },
-              }, (err, container) => {
-                if (!err) {
-                  container.start(err => {
-                    if (!err) {
-                      container.inspect((err, containerSpec) => {
-                        if (!err) {
-                          bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
+              stream.resume();
+              stream.on('end', () => {
+                docker.createContainer({
+                  Image: 'modulesio/zeo:latest',
+                  Cmd: ['/root/zeo/scripts/offline.sh'],
+                  ExposedPorts: {
+                    '8000/tcp': {},
+                  },
+                  PortBindings: {
+                    '8000/tcp': [{ 'HostPort': '' }],
+                  },
+                }, (err, container) => {
+                  if (!err) {
+                    container.start(err => {
+                      if (!err) {
+                        container.inspect((err, containerSpec) => {
+                          if (!err) {
+                            bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
 
-                          Promise.all(oldBundleContainers.map(oldBundleContainerSpec => new Promise((accept, reject) => {
-                            docker.getContainer(oldBundleContainerSpec.Id).remove({
-                              force: true,
-                            }, err => {
-                              if (!err) {
+                            Promise.all(oldBundleContainers.map(oldBundleContainerSpec => new Promise((accept, reject) => {
+                              docker.getContainer(oldBundleContainerSpec.Id).remove({
+                                force: true,
+                              }, err => {
+                                if (!err) {
+                                  accept();
+                                } else {
+                                  reject(err);
+                                }
+                              });
+                            })))
+                              .then(() => {
                                 accept();
-                              } else {
-                                reject(err);
-                              }
-                            });
-                          })))
-                            .then(() => {
-                              accept();
-                            }, reject);
-                        } else {
-                          reject(err);
-                        }
-                      });
-                    } else {
-                      reject(err);
-                    }
-                  });
-                } else {
-                  reject(err);
-                }
+                              }, reject);
+                          } else {
+                            reject(err);
+                          }
+                        });
+                      } else {
+                        reject(err);
+                      }
+                    });
+                  } else {
+                    reject(err);
+                  }
+                });
+              });
+              stream.on('error', err => {
+                reject(err);
               });
             } else {
               reject(err);
