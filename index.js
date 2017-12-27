@@ -13,7 +13,7 @@ const modulequery = require('modulequery');
 const dockerode = require('dockerode');
 const puppeteer = require('puppeteer');
 
-const font = require('./font');
+// const font = require('./font');
 
 const proxy = httpProxy.createProxyServer();
 const mq = modulequery();
@@ -189,7 +189,7 @@ app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
     });
 });
 
-app.get('/readme/:name/:version', (req, res, next) => {
+/* app.get('/readme/:name/:version', (req, res, next) => {
   const {name, version} = req.params;
   const width = parseInt(req.query.width, 10) || 640;
   const height = parseInt(req.query.height, 10) || 480;
@@ -250,7 +250,7 @@ app.get('/readme/:name/:version', (req, res, next) => {
       res.status(err.statusCode || 500);
       res.send(err.stack);
     });
-});
+}); */
 
 app.get('/preview/:protocol/:host/:port', (req, res, next) => {
   const {protocol, host} = req.params;
