@@ -17,6 +17,7 @@
     "dockerode": "^2.5.3",
     "etag": "^1.8.1",
     "express": "^4.16.2",
+    "http-proxy": "^1.16.2",
     "js-untar": "^0.1.5",
     "modulequery": "0.0.21",
     "prop-types": "^15.6.0",

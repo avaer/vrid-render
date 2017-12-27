@@ -8,12 +8,14 @@ const express = require('express');
 const etag = require('etag');
 const tmp = require('tmp');
 const rimraf = require('rimraf');
+const httpProxy = require('http-proxy');
 const modulequery = require('modulequery');
 const dockerode = require('dockerode');
 const puppeteer = require('puppeteer');
 
 const font = require('./font');
 
+const proxy = httpProxy.createProxyServer();
 const mq = modulequery();
 const docker = dockerode();
 
@@ -73,6 +75,23 @@ function _pad(n, width) {
 }
 
 const app = express();
+app.all('*', (req, res, next) => {
+  if (req.headers['host'] === 'try.zeovr.io') {
+    if (bundlePort !== null) {
+      proxy.web(req, res, {
+        target: `http://127.0.0.1:${bundlePort}`,
+      }, err => {
+        res.status(500);
+        res.end(err.stack);
+      });
+    } else {
+      res.status(404);
+      res.end(http.STATUS_CODES[404]);
+    }
+  } else {
+    next();
+  }
+});
 app.use('/static', express.static(__dirname));
 app.get('/render/:fileId/:fileName/:ext', (req, res, next) => {
   const u = `${req.params.fileId}/${req.params.fileName}/${req.params.ext}`;
