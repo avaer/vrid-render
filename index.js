@@ -470,8 +470,25 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
     });
 });
 
+app.get('/release.tar.gz', (req, res, next) => {
+  if (bundleContainer !== null) {
+    const cp = childProcess.spawn('bash', ['-c', `docker cp ${bundleContainer}:/root/zeo - | bsdtar -czf - --exclude=zeo/data @-`]);
+    cp.on('error', err => {
+      res.status(500);
+      res.end(err.stack);
+    });
+    res.type('application/gzip');
+    // cp.stderr.pipe(process.stderr);
+    cp.stdout.pipe(res);
+  } else {
+    res.status(404);
+    res.end(http.STATUS_CODES[404]);
+  }
+});
+
 let bundlePromise = null;
 let bundleQueued = false;
+let bundleContainer = null;
 let bundleAddress = null;
 let bundlePort = null;
 const _refreshBundle = () => {
@@ -502,6 +519,7 @@ const _refreshBundle = () => {
                       if (!err) {
                         container.inspect((err, containerSpec) => {
                           if (!err) {
+                            bundleContainer = containerSpec.Id;
                             bundleAddress = containerSpec.NetworkSettings.Gateway;
                             bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
 
