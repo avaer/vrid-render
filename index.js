@@ -497,8 +497,8 @@ app.get('/release.tar.gz', (req, res, next) => {
     res.end(http.STATUS_CODES[404]);
   }
 });
-app.get('/node.7z', (req, res, next) => {
-  res.redirect(`https://nodejs.org/dist/v${nodeVersion}/node-v${nodeVersion}-win-x64.7z`);
+app.get('/node.json', (req, res, next) => {
+  res.json({version: nodeVersion});
 });
 
 let bundlePromise = null;
