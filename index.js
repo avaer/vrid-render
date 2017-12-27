@@ -543,7 +543,7 @@ const _refreshBundle = () => {
                                 const newBundleTgz = [];
                                 newBundleTgz.size = 0;
 
-                                const cp = childProcess.spawn('bash', ['-c', `docker cp ${containerId}:/root/zeo - | bsdtar -czf - --exclude=zeo/data @-`]);
+                                const cp = childProcess.spawn('bash', ['-c', `docker cp ${containerId}:/root/zeo - | bsdtar -czf - --exclude='zeo/data/installed/plugins/[^_]*' @-`]);
                                 cp.stdout.on('data', d => {
                                   newBundleTgz.push(d);
                                   newBundleTgz.size += d.length;
