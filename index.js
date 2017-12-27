@@ -24,6 +24,7 @@ const securePort = 443;
 const imageSize = 640;
 const videoSize = 480;
 const maxAge = 10 * 60 * 1000;
+const nodeVersion = '8.9.3';
 
 let running = false;
 const queue = [];
@@ -495,6 +496,9 @@ app.get('/release.tar.gz', (req, res, next) => {
     res.status(404);
     res.end(http.STATUS_CODES[404]);
   }
+});
+app.get('/node.7z', (req, res, next) => {
+  res.redirect(`https://nodejs.org/dist/v${nodeVersion}/node-v${nodeVersion}-win-x64.7z`);
 });
 
 let bundlePromise = null;
