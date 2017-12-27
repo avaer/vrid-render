@@ -77,9 +77,9 @@ function _pad(n, width) {
 const app = express();
 app.all('*', (req, res, next) => {
   if (req.headers['host'] === 'try.zeovr.io') {
-    if (bundlePort !== null) {
+    if (bundleAddress !== null && bundlePort !== null) {
       proxy.web(req, res, {
-        target: `http://127.0.0.1:${bundlePort}`,
+        target: `http://${bundleAddress}:${bundlePort}`,
       }, err => {
         res.status(500);
         res.end(err.stack);
@@ -472,6 +472,7 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
 
 let bundlePromise = null;
 let bundleQueued = false;
+let bundleAddress = null;
 let bundlePort = null;
 const _refreshBundle = () => {
   if (!bundlePromise) {
@@ -501,6 +502,7 @@ const _refreshBundle = () => {
                       if (!err) {
                         container.inspect((err, containerSpec) => {
                           if (!err) {
+                            bundleAddress = containerSpec.NetworkSettings.Gateway;
                             bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
 
                             Promise.all(oldBundleContainers.map(oldBundleContainerSpec => new Promise((accept, reject) => {
