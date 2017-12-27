@@ -471,21 +471,25 @@ app.get('/spectate/:protocol/:host/:port', (req, res, next) => {
 });
 
 app.get('/release.tar.gz', (req, res, next) => {
-  if (bundleContainer !== null) {
-    const cp = childProcess.spawn('bash', ['-c', `docker cp ${bundleContainer}:/root/zeo - | bsdtar -czf - --exclude=zeo/data @-`]);
-    cp.on('error', err => {
-      res.status(500);
-      res.end(err.stack);
-    });
+  if (bundleTgz !== null) {
     res.type('application/gzip');
-    // cp.stderr.pipe(process.stderr);
-    cp.stdout.pipe(res);
 
-    req.on('aborted', () => {
-      console.log('aborted');
+    const _recurse = (i = 0) => {
+      if (i < bundleTgz.length) {
+        const _next = () => {
+          _recurse(i + 1);
+        };
 
-      cp.kill();
-    });
+        if (res.write(bundleTgz[i])) {
+          process.nextTick(_next);
+        } else {
+          res.once('drain', _next);
+        }
+      } else {
+        res.end();
+      }
+    };
+    _recurse();
   } else {
     res.status(404);
     res.end(http.STATUS_CODES[404]);
@@ -494,9 +498,9 @@ app.get('/release.tar.gz', (req, res, next) => {
 
 let bundlePromise = null;
 let bundleQueued = false;
-let bundleContainer = null;
 let bundleAddress = null;
 let bundlePort = null;
+let bundleTgz = null;
 const _refreshBundle = () => {
   if (!bundlePromise) {
     console.log('refreshing bundle');
@@ -525,21 +529,38 @@ const _refreshBundle = () => {
                       if (!err) {
                         container.inspect((err, containerSpec) => {
                           if (!err) {
-                            bundleContainer = containerSpec.Id;
                             bundleAddress = containerSpec.NetworkSettings.Gateway;
                             bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
 
-                            Promise.all(oldBundleContainers.map(oldBundleContainerSpec => new Promise((accept, reject) => {
-                              docker.getContainer(oldBundleContainerSpec.Id).remove({
-                                force: true,
-                              }, err => {
-                                if (!err) {
+                            const containerId = containerSpec.Id;
+                            Promise.all([
+                              new Promise((accept, reject) => {
+                                const newBundleTgz = [];
+                                const cp = childProcess.spawn('bash', ['-c', `docker cp ${containerId}:/root/zeo - | bsdtar -czf - --exclude=zeo/data @-`]);
+                                cp.stdout.on('data', d => {
+                                  newBundleTgz.push(d);
+                                });
+                                cp.stdout.on('end', () => {
+                                  bundleTgz = newBundleTgz;
+                                  console.log('bundle size', bundleTgz.length);
+
                                   accept();
-                                } else {
-                                  reject(err);
-                                }
-                              });
-                            })))
+                                });
+                                // cp.stderr.pipe(process.stderr);
+                                cp.on('error', reject);
+                              }),
+                              Promise.all(oldBundleContainers.map(oldBundleContainerSpec => new Promise((accept, reject) => {
+                                docker.getContainer(oldBundleContainerSpec.Id).remove({
+                                  force: true,
+                                }, err => {
+                                  if (!err) {
+                                    accept();
+                                  } else {
+                                    reject(err);
+                                  }
+                                });
+                              }))),
+                            ])
                               .then(() => {
                                 accept();
                               }, reject);
