@@ -1,6 +1,6 @@
 #!/bin/bash
 
-docker run -ti \
+docker run -d \
   -p 80:80 \
   -p 443:443 \
   -e PORT=80 \
