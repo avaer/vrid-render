@@ -24,6 +24,7 @@ const securePort = 443;
 const imageSize = 640;
 const videoSize = 480;
 const maxAge = 10 * 60 * 1000;
+const imageName = 'modulesio/zeo:hack';
 
 let running = false;
 const queue = [];
@@ -509,14 +510,14 @@ const _refreshBundle = () => {
     bundlePromise = new Promise((accept, reject) => {
       docker.listContainers((err, containers) => {
         if (!err) {
-          const oldBundleContainers = containers.filter(containerSpec => containerSpec.Image === 'modulesio/zeo:latest');
+          const oldBundleContainers = containers.filter(containerSpec => containerSpec.Image === imageName);
 
-          docker.pull('modulesio/zeo:latest', (err, stream) => {
+          docker.pull(imageName, (err, stream) => {
             if (!err) {
               stream.resume();
               stream.on('end', () => {
                 docker.createContainer({
-                  Image: 'modulesio/zeo:latest',
+                  Image: imageName,
                   Cmd: ['/root/zeo/scripts/offline.sh'],
                   ExposedPorts: {
                     '8000/tcp': {},
