@@ -527,32 +527,24 @@ const _refreshBundle = () => {
                   },
                 }, (err, container) => {
                   if (!err) {
-                    container.start(err => {
-                      if (!err) {
-                        container.inspect((err, containerSpec) => {
-                          if (!err) {
-                            bundleAddress = containerSpec.NetworkSettings.Gateway;
-                            bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
+                    const newBundleTgz = [];
+                    newBundleTgz.size = 0;
 
-                            const containerId = containerSpec.Id;
-                            Promise.all([
-                              new Promise((accept, reject) => {
-                                const newBundleTgz = [];
-                                newBundleTgz.size = 0;
+                    const cp = childProcess.spawn('bash', ['-c', `docker cp ${container.id}:/root/zeo - | gzip`]);
+                    cp.stdout.on('data', d => {
+                      newBundleTgz.push(d);
+                      newBundleTgz.size += d.length;
+                    });
+                    cp.stdout.on('end', () => {
+                      bundleTgz = newBundleTgz;
 
-                                const cp = childProcess.spawn('bash', ['-c', `docker cp ${containerId}:/root/zeo - | bsdtar -czf - --exclude='zeo/data/installed/plugins/[^_]*' @-`]);
-                                cp.stdout.on('data', d => {
-                                  newBundleTgz.push(d);
-                                  newBundleTgz.size += d.length;
-                                });
-                                cp.stdout.on('end', () => {
-                                  bundleTgz = newBundleTgz;
+                      container.start(err => {
+                        if (!err) {
+                          container.inspect((err, containerSpec) => {
+                            if (!err) {
+                              bundleAddress = containerSpec.NetworkSettings.Gateway;
+                              bundlePort = containerSpec.NetworkSettings.Ports['8000/tcp'][0].HostPort;
 
-                                  accept();
-                                });
-                                // cp.stderr.pipe(process.stderr);
-                                cp.on('error', reject);
-                              }),
                               Promise.all(oldBundleContainers.map(oldBundleContainerSpec => new Promise((accept, reject) => {
                                 docker.getContainer(oldBundleContainerSpec.Id).remove({
                                   force: true,
@@ -563,19 +555,21 @@ const _refreshBundle = () => {
                                     reject(err);
                                   }
                                 });
-                              }))),
-                            ])
-                              .then(() => {
-                                accept();
-                              }, reject);
-                          } else {
-                            reject(err);
-                          }
-                        });
-                      } else {
-                        reject(err);
-                      }
+                              })))
+                                .then(() => {
+                                  accept();
+                                }, reject);
+                            } else {
+                              reject(err);
+                            }
+                          });
+                        } else {
+                          reject(err);
+                        }
+                      });
                     });
+                    // cp.stderr.pipe(process.stderr);
+                    cp.on('error', reject);
                   } else {
                     reject(err);
                   }
