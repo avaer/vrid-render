@@ -19,7 +19,7 @@
     "express": "^4.16.2",
     "http-proxy": "^1.16.2",
     "js-untar": "^0.1.5",
-    "modulequery": "0.0.21",
+    "modulequery": "0.0.24",
     "prop-types": "^15.6.0",
     "puppeteer": "^0.13.0",
     "react": "^16.1.1",
